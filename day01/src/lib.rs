@@ -56,5 +56,42 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let mut position = INITIAL_POSITION;
+    let mut zero_count = 0;
+
+    for instruction in parse::<Instruction>(input)? {
+        let motion = match instruction.direction {
+            Direction::Left => -instruction.qty,
+            Direction::Right => instruction.qty,
+        };
+        let next_position = position + motion;
+
+        let position_bounded = position.rem_euclid(DIAL_SIZE);
+        let next_position_bounded = next_position.rem_euclid(DIAL_SIZE);
+
+        let mut passed_zeros = {
+            // "day" is a bad term here, but I'm blanking on anything better.
+            // it's an identifier for a particular 0-99 range of the dial;
+            // a full spin of the wheel.
+            // if we're in the same day, we have not clicked past 0.
+            // If we're in a different day, we have clicked past 0 some amount of times.
+            let start_dial_day = position.div_euclid(DIAL_SIZE);
+            let end_dial_day = next_position.div_euclid(DIAL_SIZE);
+            start_dial_day.abs_diff(end_dial_day)
+        };
+        // a limitaiton of the day count mechanism: left turns from 0 produce an extra false count
+        if position_bounded == 0 && instruction.direction == Direction::Left && passed_zeros > 0 {
+            passed_zeros -= 1;
+        }
+        // a second limitation of the day count mechanism: left turns onto 0 undercount
+        if next_position_bounded == 0 && instruction.direction == Direction::Left {
+            passed_zeros += 1;
+        }
+
+        zero_count += passed_zeros;
+        position = next_position;
+    }
+
+    println!("zero count (pt 2): {zero_count}");
+    Ok(())
 }
