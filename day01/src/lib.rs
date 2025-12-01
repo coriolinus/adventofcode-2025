@@ -37,15 +37,20 @@ impl FromStr for Instruction {
     }
 }
 
+impl Instruction {
+    fn motion(&self) -> i32 {
+        match self.direction {
+            Direction::Left => -self.qty,
+            Direction::Right => self.qty,
+        }
+    }
+}
+
 pub fn part1(input: &Path) -> Result<()> {
     let mut position = INITIAL_POSITION;
     let mut zero_count = 0;
     for instruction in parse::<Instruction>(input)? {
-        let motion = match instruction.direction {
-            Direction::Left => -instruction.qty,
-            Direction::Right => instruction.qty,
-        };
-        position += motion;
+        position += instruction.motion();
 
         if position.rem_euclid(DIAL_SIZE) == 0 {
             zero_count += 1;
@@ -60,11 +65,7 @@ pub fn part2(input: &Path) -> Result<()> {
     let mut zero_count = 0;
 
     for instruction in parse::<Instruction>(input)? {
-        let motion = match instruction.direction {
-            Direction::Left => -instruction.qty,
-            Direction::Right => instruction.qty,
-        };
-        let next_position = position + motion;
+        let next_position = position + instruction.motion();
 
         let position_bounded = position.rem_euclid(DIAL_SIZE);
         let next_position_bounded = next_position.rem_euclid(DIAL_SIZE);
