@@ -3,6 +3,7 @@ use color_eyre::{
     eyre::{Context, OptionExt, Report},
     Result,
 };
+use itertools::Itertools as _;
 use std::{path::Path, str::FromStr};
 
 type ProductId = u64;
@@ -36,7 +37,7 @@ impl IntoIterator for ProductIdRange {
     }
 }
 
-fn id_is_valid(id: ProductId) -> bool {
+fn id_is_valid_pt1(id: ProductId) -> bool {
     let s = id.to_string();
     let half_len = s.len() / 2;
     if !s.is_char_boundary(half_len) {
@@ -47,6 +48,22 @@ fn id_is_valid(id: ProductId) -> bool {
     first_half.len() != second_half.len() || first_half != second_half
 }
 
+fn id_is_valid_pt2(id: ProductId) -> bool {
+    let s = id.to_string();
+    let s = s.as_bytes();
+    for chunk_size in 1..=(s.len() / 2) {
+        if !s.len().is_multiple_of(chunk_size) {
+            continue;
+        }
+
+        if s.chunks(chunk_size).all_equal() {
+            return false;
+        };
+    }
+
+    true
+}
+
 pub fn part1(input: &Path) -> Result<()> {
     for (n, row) in parse::<CommaSep<ProductIdRange>>(input)?.enumerate() {
         println!("part 1 row {n}:");
@@ -54,7 +71,7 @@ pub fn part1(input: &Path) -> Result<()> {
         let sum_invalid_ids = row
             .into_iter()
             .flat_map(|id_range| id_range.into_iter())
-            .filter(|id| !id_is_valid(*id))
+            .filter(|id| !id_is_valid_pt1(*id))
             .sum::<u64>();
         println!(" sum of invalid ids: {sum_invalid_ids}");
     }
@@ -63,5 +80,16 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    for (n, row) in parse::<CommaSep<ProductIdRange>>(input)?.enumerate() {
+        println!("part 2 row {n}:");
+
+        let sum_invalid_ids = row
+            .into_iter()
+            .flat_map(|id_range| id_range.into_iter())
+            .filter(|id| !id_is_valid_pt2(*id))
+            .sum::<u64>();
+        println!(" sum of invalid ids: {sum_invalid_ids}");
+    }
+
+    Ok(())
 }
