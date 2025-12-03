@@ -48,12 +48,6 @@ impl Bank {
             return Err(eyre!("bank has too few batteries"));
         }
 
-        // each input has 100 numbers. Just iterating over each 12-combination is untenable; there are ~1e15 such.
-        // let's just try naively using exactly the same strategy as in part 1, writ large
-
-        // this kind of allocation-elimination microoptimization is honestly kind of pointless; this runs fast enough.
-        // but on the other hand, it's a chance to learn something new, so...
-
         // initialization loop
         let mut indices: [MaybeUninit<usize>; N] = [MaybeUninit::uninit(); N];
         for index in 0..N {
@@ -83,26 +77,21 @@ impl Bank {
     }
 }
 
-pub fn part1(input: &Path) -> Result<()> {
+fn solve<const N: usize>(input: &Path, part_n: u8) -> Result<()> {
     let total_output_joltage = parse::<Bank>(input)?
         .map(|bank| -> Result<_> {
-            let indices = bank.select_indices::<2>()?;
-            let joltage = bank.joltage_from_indices(indices);
-            Ok(joltage)
+            bank.select_indices::<N>()
+                .map(|indices| bank.joltage_from_indices(indices))
         })
         .try_fold(0, |acc, elem| -> Result<_> { Ok(elem? + acc) })?;
-    println!("total output joltage: {total_output_joltage}");
+    println!("total output joltage (part {part_n}): {total_output_joltage}");
     Ok(())
 }
 
+pub fn part1(input: &Path) -> Result<()> {
+    solve::<2>(input, 1)
+}
+
 pub fn part2(input: &Path) -> Result<()> {
-    let total_output_joltage = parse::<Bank>(input)?
-        .map(|bank| -> Result<_> {
-            let indices = bank.select_indices::<12>()?;
-            let joltage = bank.joltage_from_indices(indices);
-            Ok(joltage)
-        })
-        .try_fold(0, |acc, elem| -> Result<_> { Ok(elem? + acc) })?;
-    println!("total output joltage (pt2): {total_output_joltage}");
-    Ok(())
+    solve::<12>(input, 2)
 }
