@@ -25,7 +25,7 @@ impl FromStr for Bank {
 }
 
 impl Bank {
-    fn joltage_from_indices<const N: usize>(&self, indices: [usize; N]) -> u32 {
+    fn joltage_from_indices<const N: usize>(&self, indices: [usize; N]) -> u64 {
         debug_assert!(
             indices.windows(2).all(|window| window[0] < window[1]),
             "each subsequent index must increase"
@@ -37,8 +37,8 @@ impl Bank {
             .enumerate()
             .map(|(exponent, index)| {
                 let exponent = exponent as u32;
-                let value = self.0[index] as u32;
-                10_u32.pow(exponent) * value
+                let value = self.0[index] as u64;
+                10_u64.pow(exponent) * value
             })
             .sum()
     }
@@ -73,7 +73,29 @@ impl Bank {
     }
 
     fn select_indices_pt2(&self) -> Result<[usize; 12]> {
-        todo!()
+        if self.0.len() < 12 {
+            return Err(eyre!("bank has too few batteries"));
+        }
+
+        // each input has 100 numbers. Just iterating over each 12-combination is untenable; there are ~1e15 such.
+        // let's just try naively using exactly the same strategy as in part 1, writ large
+        let mut indices = Vec::with_capacity(12);
+        for index in 0..12 {
+            let mut iter = Box::new(self.0.iter().enumerate().rev().skip(12 - 1 - index))
+                as Box<dyn Iterator<Item = (usize, &u8)>>;
+            if index > 0 {
+                iter = Box::new(iter.take_while(|(idx, _value)| *idx > indices[index - 1]));
+            }
+            indices.push(
+                iter.max_by_key(|(_idx, value)| **value)
+                    .expect("maxing a non-empty list always produces something")
+                    .0,
+            );
+        }
+        debug_assert_eq!(indices.len(), 12);
+        Ok(indices
+            .try_into()
+            .expect("we have 12 elements because we pushed 12 indices"))
     }
 }
 
