@@ -25,9 +25,22 @@ impl FromStr for Bank {
 }
 
 impl Bank {
-    fn joltage_from_indices(&self, left: usize, right: usize) -> u32 {
-        debug_assert!(left < right, "invalid index choice");
-        u32::from(self.0[left] * 10) + u32::from(self.0[right])
+    fn joltage_from_indices<const N: usize>(&self, indices: [usize; N]) -> u32 {
+        debug_assert!(
+            indices.windows(2).all(|window| window[0] < window[1]),
+            "each subsequent index must increase"
+        );
+        indices
+            .iter()
+            .copied()
+            .rev()
+            .enumerate()
+            .map(|(exponent, index)| {
+                let exponent = exponent as u32;
+                let value = self.0[index] as u32;
+                10_u32.pow(exponent) * value
+            })
+            .sum()
     }
 
     fn select_indices_pt1(&self) -> Result<(usize, usize)> {
@@ -58,13 +71,17 @@ impl Bank {
 
         Ok((left, right))
     }
+
+    fn select_indices_pt2(&self) -> Result<[usize; 12]> {
+        todo!()
+    }
 }
 
 pub fn part1(input: &Path) -> Result<()> {
     let total_output_joltage = parse::<Bank>(input)?
         .map(|bank| -> Result<_> {
             let (left, right) = bank.select_indices_pt1()?;
-            let joltage = bank.joltage_from_indices(left, right);
+            let joltage = bank.joltage_from_indices([left, right]);
             Ok(joltage)
         })
         .try_fold(0, |acc, elem| -> Result<_> { Ok(elem? + acc) })?;
@@ -73,5 +90,13 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let total_output_joltage = parse::<Bank>(input)?
+        .map(|bank| -> Result<_> {
+            let indices = bank.select_indices_pt2()?;
+            let joltage = bank.joltage_from_indices(indices);
+            Ok(joltage)
+        })
+        .try_fold(0, |acc, elem| -> Result<_> { Ok(elem? + acc) })?;
+    println!("total output joltage (pt2): {total_output_joltage}");
+    Ok(())
 }
