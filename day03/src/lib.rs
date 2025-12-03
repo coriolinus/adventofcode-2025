@@ -3,7 +3,7 @@ use color_eyre::{
     eyre::{eyre, OptionExt, Report},
     Result,
 };
-use std::{path::Path, str::FromStr};
+use std::{mem::MaybeUninit, path::Path, str::FromStr};
 
 /// Battery bank
 struct Bank(Vec<u8>);
@@ -79,23 +79,38 @@ impl Bank {
 
         // each input has 100 numbers. Just iterating over each 12-combination is untenable; there are ~1e15 such.
         // let's just try naively using exactly the same strategy as in part 1, writ large
-        let mut indices = Vec::with_capacity(12);
+
+        // this kind of allocation-elimination microoptimization is honestly kind of pointless; this runs fast enough.
+        // but on the other hand, it's a chance to learn something new, so...
+
+        // here are two types that I promise have the same memory layout
+        type Uninit = [MaybeUninit<usize>; 12];
+        type Init = [usize; 12];
+
+        // initialization loop
+        let mut indices: Uninit = [MaybeUninit::uninit(); 12];
         for index in 0..12 {
-            let mut iter = Box::new(self.0.iter().enumerate().rev().skip(12 - 1 - index))
-                as Box<dyn Iterator<Item = (usize, &u8)>>;
-            if index > 0 {
-                iter = Box::new(iter.take_while(|(idx, _value)| *idx > indices[index - 1]));
-            }
-            indices.push(
+            let mut initial_iter = self.0.iter().enumerate().rev().skip(12 - 1 - index);
+            let mut adapted_iter;
+            let iter = if index > 0 {
+                // SAFETY: we choose the indices in order and only refer to a previous one
+                let previous_index = unsafe { indices[index - 1].assume_init() };
+                adapted_iter = initial_iter.take_while(move |(idx, _value)| *idx > previous_index);
+                &mut adapted_iter as &mut dyn Iterator<Item = _>
+            } else {
+                &mut initial_iter
+            };
+
+            indices[index].write(
                 iter.max_by_key(|(_idx, value)| **value)
                     .expect("maxing a non-empty list always produces something")
                     .0,
             );
         }
-        debug_assert_eq!(indices.len(), 12);
-        Ok(indices
-            .try_into()
-            .expect("we have 12 elements because we pushed 12 indices"))
+
+        // safety: initializing an array by element is literally in the MaybeUninit docs:
+        // https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html
+        Ok(unsafe { std::mem::transmute::<Uninit, Init>(indices) })
     }
 }
 
