@@ -3,7 +3,7 @@ use color_eyre::{
     eyre::{eyre, OptionExt, Report},
     Result,
 };
-use std::{mem::MaybeUninit, path::Path, str::FromStr};
+use std::{path::Path, str::FromStr};
 
 /// Battery bank
 struct Bank(Vec<u8>);
@@ -49,31 +49,25 @@ impl Bank {
         }
 
         // initialization loop
-        let mut indices: [MaybeUninit<usize>; N] = [MaybeUninit::uninit(); N];
+        let mut indices = [0; N];
         for index in 0..N {
             let mut initial_iter = self.0.iter().enumerate().rev().skip(N - 1 - index);
             let mut adapted_iter;
             let iter = if index > 0 {
-                // SAFETY: we choose the indices in order and only refer to a previous one
-                let previous_index = unsafe { indices[index - 1].assume_init() };
+                let previous_index = indices[index - 1];
                 adapted_iter = initial_iter.take_while(move |(idx, _value)| *idx > previous_index);
                 &mut adapted_iter as &mut dyn Iterator<Item = _>
             } else {
                 &mut initial_iter
             };
 
-            indices[index].write(
-                iter.max_by_key(|(_idx, value)| **value)
-                    .expect("maxing a non-empty list always produces something")
-                    .0,
-            );
+            indices[index] = iter
+                .max_by_key(|(_idx, value)| **value)
+                .expect("maxing a non-empty list always produces something")
+                .0;
         }
 
-        // safety: initializing an array by element is literally in the MaybeUninit docs:
-        // https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html
-        // and I'm basically stealing the implementation from the (unstable) `MaybeUninit::array_assume_init`:
-        // https://github.com/joboet/rust/blob/985071b08f5c03e4f18d43c15f3ea82395588a5e/library/core/src/mem/maybe_uninit.rs#L843
-        Ok(unsafe { (&indices as *const _ as *const [usize; N]).read() })
+        Ok(indices)
     }
 }
 
