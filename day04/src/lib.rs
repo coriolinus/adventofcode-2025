@@ -43,6 +43,17 @@ fn is_accessable_by_forklift(map: &Map<Tile>, point: Point) -> bool {
             < 4
 }
 
+fn remove_accessable(map: &Map<Tile>, next_map: &mut Map<Tile>) -> u32 {
+    let mut removed = 0;
+    for (point, &tile) in map.iter() {
+        if tile == Tile::PaperRoll && is_accessable_by_forklift(map, point) {
+            removed += 1;
+            next_map[point] = Tile::Empty;
+        }
+    }
+    removed
+}
+
 pub fn part1(input: &Path) -> Result<()> {
     let map = <Map<Tile> as TryFrom<&Path>>::try_from(input)?;
     // let mut debug_map = Map::<DebugTile>::new(map.width(), map.height());
@@ -65,5 +76,18 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let mut map = <Map<Tile> as TryFrom<&Path>>::try_from(input)?;
+    let mut next_map = map.clone();
+
+    let mut total_removed = 0;
+    while {
+        let removed = remove_accessable(&map, &mut next_map);
+        total_removed += removed;
+        removed > 0
+    } {
+        map = next_map.clone();
+    }
+
+    println!("total removed (pt2): {total_removed}");
+    Ok(())
 }
