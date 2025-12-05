@@ -1,6 +1,6 @@
 use color_eyre::{
-    eyre::{eyre, Context, OptionExt},
     Result,
+    eyre::{Context, OptionExt, eyre},
 };
 use std::{
     io::{BufRead, BufReader},
@@ -63,18 +63,41 @@ impl Input {
             }
         }
 
-        fresh_ranges.sort_unstable_by_key(|range| range.low);
-        available.sort_unstable();
-
         Ok(Self {
             fresh_ranges,
             available,
         })
     }
+
+    fn consolidate_ranges(&mut self) {
+        self.fresh_ranges.sort_unstable_by_key(|range| range.low);
+        let mut consolidated = Vec::new();
+
+        // index of range containing low bound
+        let mut low_idx = 0;
+        while low_idx < self.fresh_ranges.len() {
+            let low = self.fresh_ranges[low_idx].low;
+            let mut high = self.fresh_ranges[low_idx].high;
+            let mut high_idx = low_idx + 1;
+
+            while let Some(high_range) = self.fresh_ranges.get(high_idx).copied()
+                && high_range.low <= high + 1
+            {
+                high_idx += 1;
+                high = high.max(high_range.high);
+            }
+
+            consolidated.push(Range { low, high });
+            low_idx = high_idx;
+        }
+
+        self.fresh_ranges = consolidated;
+    }
 }
 
 pub fn part1(input: &Path) -> Result<()> {
-    let input = Input::from_path(input)?;
+    let mut input = Input::from_path(input)?;
+    input.consolidate_ranges();
     dbg!(input);
     Ok(())
 }
