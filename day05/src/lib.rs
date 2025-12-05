@@ -20,6 +20,14 @@ impl Range {
     fn contains(&self, ingredient: IngredientId) -> bool {
         self.low <= ingredient && self.high >= ingredient
     }
+
+    // yeah, of course these ingredient IDs are already u64s,
+    // but semantically a count qty is very different from an
+    // ingredient id, and the casts serve to highlight that
+    #[allow(clippy::unnecessary_cast)]
+    fn count(&self) -> u64 {
+        self.high as u64 - self.low as u64 + 1
+    }
 }
 
 impl FromStr for Range {
@@ -122,5 +130,9 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let mut input = Input::from_path(input)?;
+    input.consolidate_ranges();
+    let total_fresh = input.fresh_ranges.iter().map(Range::count).sum::<u64>();
+    println!("total fresh ingredients (pt 2): {total_fresh}");
+    Ok(())
 }
