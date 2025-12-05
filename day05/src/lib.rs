@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-type IngredientId = u32;
+type IngredientId = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Range {
@@ -93,12 +93,31 @@ impl Input {
 
         self.fresh_ranges = consolidated;
     }
+
+    fn is_fresh(&self, ingredient: IngredientId) -> bool {
+        debug_assert!(
+            self.fresh_ranges
+                .windows(2)
+                .all(|window| window[0].high < window[1].low),
+            "all ranges must be consolidated before calling this method"
+        );
+        // could maybe get fancy with a binary search, but let's try this for now
+        self.fresh_ranges
+            .iter()
+            .any(|range| range.contains(ingredient))
+    }
 }
 
 pub fn part1(input: &Path) -> Result<()> {
     let mut input = Input::from_path(input)?;
     input.consolidate_ranges();
-    dbg!(input);
+    let n_fresh = input
+        .available
+        .iter()
+        .copied()
+        .filter(|&ingredient| input.is_fresh(ingredient))
+        .count();
+    println!("n fresh ingredients: {n_fresh}");
     Ok(())
 }
 
