@@ -1,0 +1,84 @@
+use color_eyre::{
+    eyre::{eyre, Context, OptionExt},
+    Result,
+};
+use std::{
+    io::{BufRead, BufReader},
+    path::Path,
+    str::FromStr,
+};
+
+type IngredientId = u32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Range {
+    low: IngredientId,
+    high: IngredientId,
+}
+
+impl Range {
+    fn contains(&self, ingredient: IngredientId) -> bool {
+        self.low <= ingredient && self.high >= ingredient
+    }
+}
+
+impl FromStr for Range {
+    type Err = color_eyre::eyre::Report;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let dash = s.find('-').ok_or_eyre("no hyphen")?;
+        let (low, rest) = s.split_at(dash);
+        let (_dash, high) = rest.split_at(1);
+        let low = low.parse()?;
+        let high = high.parse()?;
+        Ok(Self { low, high })
+    }
+}
+
+#[derive(Debug)]
+pub struct Input {
+    fresh_ranges: Vec<Range>,
+    available: Vec<IngredientId>,
+}
+
+impl Input {
+    fn from_path(input: &Path) -> Result<Self> {
+        let mut fresh_ranges = Vec::new();
+        let mut available = Vec::new();
+
+        let reader = BufReader::new(std::fs::File::open(input).wrap_err("opening input file")?);
+        for (line_number_0, line) in reader.lines().enumerate() {
+            let line_number = line_number_0 + 1;
+            let line = line.wrap_err_with(|| format!("reading line {line_number}"))?;
+
+            if line.is_empty() {
+                continue;
+            }
+            if let Ok(range) = line.parse::<Range>() {
+                fresh_ranges.push(range);
+            } else if let Ok(ingredient) = line.parse::<IngredientId>() {
+                available.push(ingredient);
+            } else {
+                return Err(eyre!("failed to parse line {line_number}: {line}"));
+            }
+        }
+
+        fresh_ranges.sort_unstable_by_key(|range| range.low);
+        available.sort_unstable();
+
+        Ok(Self {
+            fresh_ranges,
+            available,
+        })
+    }
+}
+
+pub fn part1(input: &Path) -> Result<()> {
+    let input = Input::from_path(input)?;
+    dbg!(input);
+    Ok(())
+}
+
+pub fn part2(input: &Path) -> Result<()> {
+    unimplemented!("input file: {:?}", input)
+}
