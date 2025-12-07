@@ -5,19 +5,17 @@ use color_eyre::{
 };
 use std::path::Path;
 
-#[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, parse_display::FromStr, parse_display::Display,
-)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, strum::EnumString, strum::Display)]
 enum Tile {
     #[default]
-    #[display(".")]
+    #[strum(serialize = ".")]
     Empty,
-    #[display("S")]
+    #[strum(serialize = "S")]
     Start,
-    #[display("^")]
+    #[strum(serialize = "^")]
     Splitter,
-    #[display("|")]
-    Beam,
+    #[strum(serialize = "|")]
+    Beam(u64),
 }
 
 impl DisplayWidth for Tile {
@@ -25,8 +23,31 @@ impl DisplayWidth for Tile {
 }
 
 impl Tile {
-    fn projects_beam(&self) -> bool {
-        matches!(self, Self::Start | Self::Beam)
+    /// How many timelines led to the beam being present in this tile?
+    fn timelines(&self) -> Option<u64> {
+        match self {
+            Tile::Empty | Tile::Splitter => None,
+            Tile::Start => Some(1),
+            Tile::Beam(n) => Some(*n),
+        }
+    }
+
+    /// Adjust the number of timelines in this tile.
+    ///
+    /// If the function returns a number greater than 0, this tile becomes a beam with the given number of timelines.
+    /// Otherwise, it becomes empty.
+    fn adjust_timelines(&mut self, adjustment: impl FnOnce(u64) -> u64) -> Result<()> {
+        if matches!(self, Self::Start | Self::Splitter) {
+            return Err(eyre!("cannot mutate start or splitter tiles"));
+        }
+        let existing_timelines = self.timelines().unwrap_or_default();
+        let timelines = adjustment(existing_timelines);
+        if timelines == 0 {
+            *self = Tile::Empty
+        } else {
+            *self = Tile::Beam(timelines)
+        }
+        Ok(())
     }
 }
 
@@ -44,7 +65,9 @@ impl TachyonManifold {
     /// Project the tachyon beam through the manifold, counting the number of times the beam is split.
     ///
     /// The number of splits is just the number of splitters which were impacted by a beam.
-    fn project(&mut self) -> Result<u32> {
+    ///
+    /// The beam at any given point records the number of timelines which lead to a beam existing at this point.
+    fn project(&mut self) -> Result<u64> {
         let mut new_split_beams = 0;
         let (dx, dy) = Direction::Down.deltas();
         for left_edge in self
@@ -54,21 +77,22 @@ impl TachyonManifold {
         {
             let (dx, dy) = Direction::Right.deltas();
             for point in self.diagram.project(left_edge, dx, dy) {
-                if !self.diagram[point + Direction::Up].projects_beam() {
+                let Some(timelines_from_above) = self.diagram[point + Direction::Up].timelines()
+                else {
+                    // no projections from above; the rest of this loop is irrelevant
                     continue;
-                }
+                };
                 match self.diagram[point] {
                     Tile::Start => {
                         return Err(eyre!("beam intersected a start point; are there two?"))
                     }
-                    Tile::Beam => {}
-                    Tile::Empty => self.diagram[point] = Tile::Beam,
+                    Tile::Empty | Tile::Beam(_) => self.diagram[point]
+                        .adjust_timelines(|current| current + timelines_from_above)?,
                     Tile::Splitter => {
                         new_split_beams += 1;
                         for direction in [Direction::Left, Direction::Right] {
-                            if self.diagram[point + direction] == Tile::Empty {
-                                self.diagram[point + direction] = Tile::Beam;
-                            }
+                            self.diagram[point + direction]
+                                .adjust_timelines(|current| current + timelines_from_above)?;
                         }
                     }
                 }
@@ -86,5 +110,13 @@ pub fn part1(input: &Path) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let mut manifold = TachyonManifold::parse(input)?;
+    manifold.project()?;
+    let timelines = manifold
+        .diagram
+        .edge(Direction::Down)
+        .map(|point| manifold.diagram[point].timelines().unwrap_or_default())
+        .sum::<u64>();
+    println!("timelines (pt 2): {timelines}");
+    Ok(())
 }
