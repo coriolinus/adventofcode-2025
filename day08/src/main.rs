@@ -26,6 +26,8 @@ struct RunArgs {
     /// Part 1 connection limit
     ///
     /// How many point pairs to connect before computing circuit sizes
+    ///
+    /// For the example, you should use 10; for the real problem, you should use 1000
     #[arg(
         short,
         long,
