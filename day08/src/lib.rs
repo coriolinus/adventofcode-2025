@@ -1,5 +1,5 @@
 use aoclib::parse;
-use color_eyre::Result;
+use color_eyre::{eyre::OptionExt, Result};
 use std::{
     collections::{BTreeMap, HashMap},
     path::Path,
@@ -38,9 +38,13 @@ impl Point {
 ///
 /// The assignments are a map whose key is the circuit ID and whose value is the set of indices in the `points`
 /// list which are assigned to this circuit.
+///
+/// If `connection_limit` is `None` then when the loop breaks due to all junction boxes forming a single circuit,
+/// the final two points which were joined will be assigned to `break_points`. This value is never read from within this function.
 fn compute_circuit_assignments(
     points: &[Point],
     connection_limit: Option<usize>,
+    break_points: &mut Option<(Point, Point)>,
 ) -> HashMap<usize, Vec<usize>> {
     // each point starts assigned to its own circuit, where the circuit id is the index of that point in points
     let mut circuit_assignments = (0..points.len()).collect::<Vec<_>>();
@@ -101,6 +105,7 @@ fn compute_circuit_assignments(
         small_indices.append(&mut big_indices);
 
         if indices_by_circuit.len() <= 1 {
+            *break_points = Some((points[i], points[j]));
             break;
         }
     }
@@ -113,7 +118,7 @@ fn compute_circuit_assignments(
 /// - compute distances between each point pair
 /// - considering point pairs in order by distance, connect them
 fn solve_part1(points: &[Point], connection_limit: usize) -> u64 {
-    let indices_by_circuit = compute_circuit_assignments(points, Some(connection_limit));
+    let indices_by_circuit = compute_circuit_assignments(points, Some(connection_limit), &mut None);
     let mut circuit_sizes = indices_by_circuit
         .values()
         .map(|indices| indices.len() as u64)
@@ -130,5 +135,11 @@ pub fn part1(input: &Path, connection_limit: usize) -> Result<()> {
 }
 
 pub fn part2(input: &Path) -> Result<()> {
-    unimplemented!("input file: {:?}", input)
+    let points = parse::<Point>(input)?.collect::<Vec<_>>();
+    let mut break_points = None;
+    compute_circuit_assignments(&points, None, &mut break_points);
+    let (a, b) = break_points.ok_or_eyre("no break points computed somehow")?;
+    let x_product = a.x as u64 * b.x as u64;
+    println!("x product (pt 2): {x_product}");
+    Ok(())
 }
