@@ -1,16 +1,19 @@
+mod snoob;
+
 use aoclib::parse;
 use color_eyre::{
-    eyre::{bail, Context, OptionExt, Report},
+    eyre::{bail, eyre, Context, OptionExt, Report},
     Result,
 };
 use lazy_regex::{regex_captures, regex_captures_iter};
+use snoob::PermutationIterator;
 use std::{path::Path, str::FromStr};
 
 type LightState = u32;
 
 struct Machine {
-    n_indicator_lights: usize,
-    indicator_lights: LightState,
+    n_indicator_lights: u32,
+    target_indicator_state: LightState,
     buttons: Vec<LightState>,
     joltage_requirements: Vec<u32>,
 }
@@ -25,7 +28,7 @@ impl FromStr for Machine {
 
         // indicator lights
         let indicator_lights_in = indicator_lights_in.as_bytes();
-        let n_indicator_lights = indicator_lights_in.len();
+        let n_indicator_lights = indicator_lights_in.len() as _;
         let mut indicator_lights = 0;
         for (idx, light) in indicator_lights_in.iter().enumerate() {
             match light {
@@ -60,7 +63,7 @@ impl FromStr for Machine {
 
         Ok(Self {
             n_indicator_lights,
-            indicator_lights,
+            target_indicator_state: indicator_lights,
             buttons,
             joltage_requirements,
         })
@@ -68,22 +71,54 @@ impl FromStr for Machine {
 }
 
 impl Machine {
+    // this is only useful for debugging
+    #[allow(dead_code)]
     fn summarize(&self) -> String {
         format!(
             "light state: {state:0width$b}\n{n_buttons} buttons\n{n_joltage} joltage requirements\n",
-            state = self.indicator_lights,
-            width = self.n_indicator_lights,
+            state = self.target_indicator_state,
+            width = self.n_indicator_lights as _,
             n_buttons = self.buttons.len(),
             n_joltage = self.joltage_requirements.len(),
         )
     }
+
+    /// Compute the light state after pressing the selected buttons
+    ///
+    /// (there is never any point in pressing any button more than once, as two pushes are a noop)
+    fn compute_light_state_for_buttons(&self, button_presses: LightState) -> LightState {
+        let mut state = 0;
+        for (idx, button) in self.buttons.iter().copied().enumerate() {
+            if button_presses & 1 << idx != 0 {
+                state ^= button;
+            }
+        }
+        state
+    }
 }
 
 pub fn part1(input: &Path) -> Result<()> {
-    for machine in parse::<Machine>(input)? {
-        println!("{}", machine.summarize());
-    }
-    todo!("now do something")
+    let total_presses = parse::<Machine>(input)?
+        .enumerate()
+        .map(|(idx, machine)| {
+            PermutationIterator::new(machine.n_indicator_lights)
+                .ok_or_else(|| {
+                    eyre!(
+                        "machine {idx} of width {} could not construct permutation iterator",
+                        machine.n_indicator_lights
+                    )
+                })?
+                .find_map(|button_presses| {
+                    (machine.compute_light_state_for_buttons(button_presses)
+                        == machine.target_indicator_state)
+                        .then(|| button_presses.count_ones())
+                })
+                .ok_or_eyre(format!("no combination of buttons turned on machine {idx}"))
+        })
+        .sum::<Result<u32, _>>()?;
+
+    println!("total button presses to activate machines: {total_presses}");
+    Ok(())
 }
 
 pub fn part2(input: &Path) -> Result<()> {
