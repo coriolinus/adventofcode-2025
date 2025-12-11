@@ -73,3 +73,28 @@ impl PermutationIterator {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn iterator_returns_expected_number_of_items() {
+        for n in 1..=10 {
+            let count = PermutationIterator::new(n).unwrap().count();
+            let expected = 2_usize.pow(n) - 1;
+            assert_eq!(count, expected);
+        }
+    }
+
+    #[test]
+    fn iterator_returns_complete_set_of_items() {
+        for n in 1..=10 {
+            let mut items = PermutationIterator::new(n).unwrap().collect::<Vec<_>>();
+            assert_eq!(items[0], 1);
+            assert_eq!(*items.last().unwrap(), n_low_ones(n));
+            items.sort_unstable();
+            assert!(items.windows(2).all(|window| window[1] == window[0] + 1));
+        }
+    }
+}

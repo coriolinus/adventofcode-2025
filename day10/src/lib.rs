@@ -5,6 +5,7 @@ use color_eyre::{
     eyre::{bail, eyre, Context, OptionExt, Report},
     Result,
 };
+use itertools::Itertools as _;
 use lazy_regex::{regex_captures, regex_captures_iter};
 use snoob::PermutationIterator;
 use std::{path::Path, str::FromStr};
@@ -71,15 +72,21 @@ impl FromStr for Machine {
 }
 
 impl Machine {
-    // this is only useful for debugging
-    #[allow(dead_code)]
     fn summarize(&self) -> String {
+        let buttons = self
+            .buttons
+            .iter()
+            .map(|button| format!("{button:0width$b}", width = self.n_indicator_lights as _))
+            .join(", ");
+        let joltage_requirements = self
+            .joltage_requirements
+            .iter()
+            .map(|joltage| joltage.to_string())
+            .join(", ");
         format!(
-            "light state: {state:0width$b}\n{n_buttons} buttons\n{n_joltage} joltage requirements\n",
+            "light state: {state:0width$b}\nbuttons: {buttons}\njoltage requirements: {joltage_requirements}\n",
             state = self.target_indicator_state,
             width = self.n_indicator_lights as _,
-            n_buttons = self.buttons.len(),
-            n_joltage = self.joltage_requirements.len(),
         )
     }
 
@@ -101,7 +108,7 @@ pub fn part1(input: &Path) -> Result<()> {
     let total_presses = parse::<Machine>(input)?
         .enumerate()
         .map(|(idx, machine)| {
-            PermutationIterator::new(machine.n_indicator_lights)
+            PermutationIterator::new(machine.buttons.len() as _)
                 .ok_or_else(|| {
                     eyre!(
                         "machine {idx} of width {} could not construct permutation iterator",
@@ -113,7 +120,12 @@ pub fn part1(input: &Path) -> Result<()> {
                         == machine.target_indicator_state)
                         .then(|| button_presses.count_ones())
                 })
-                .ok_or_eyre(format!("no combination of buttons turned on machine {idx}"))
+                .ok_or_else(|| {
+                    eyre!(
+                        "no combination of buttons turned on machine {idx}:\n{}",
+                        machine.summarize()
+                    )
+                })
         })
         .sum::<Result<u32, _>>()?;
 
